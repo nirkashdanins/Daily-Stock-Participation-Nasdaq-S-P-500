@@ -35,8 +35,10 @@ UA = {
     "Accept": "*/*",
 }
 
-INVESCO_URL = ("https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/QQQ/"
-               "holdings/fund?idType=ticker&productType=ETF")
+INVESCO_URLS = [
+    "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/QQQ/holdings/fund?idType=ticker&productType=ETF",
+    "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/QQQ/holdings/fund?idType=ticker&interval=daily&productType=ETF",
+]
 SSGA_URL = ("https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/"
             "etfs/us/holdings-daily-us-en-spy.xlsx")
 INDEX_SYMBOL = {"QQQ": "^NDX", "SPY": "^GSPC"}
@@ -50,11 +52,33 @@ SEMIS = {
 
 
 # ───────────────────────── שליפת אחזקות ─────────────────────────
+def http_get(urls: list[str], referer: str, accept: str = "*/*") -> bytes:
+    """GET עם טביעת דפדפן Chrome (curl_cffi), כמה כתובות חלופיות וניסיונות חוזרים."""
+    import time
+    headers = {"Referer": referer, "Origin": referer.rstrip("/"), "Accept": accept,
+               "Accept-Language": "en-US,en;q=0.9"}
+    errors = []
+    for url in urls:
+        for attempt in range(3):
+            try:
+                try:
+                    from curl_cffi import requests as cr
+                    r = cr.get(url, headers=headers, impersonate="chrome", timeout=60)
+                except ImportError:
+                    import requests
+                    r = requests.get(url, headers={**UA, **headers}, timeout=60)
+                if r.status_code == 200 and r.content:
+                    return r.content
+                errors.append(f"{url[:70]}… → HTTP {r.status_code}: {r.text[:120]!r}")
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{url[:70]}… → {type(e).__name__}: {e}")
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError("שליפה נכשלה:\n  " + "\n  ".join(errors[-6:]))
+
+
 def fetch_qqq_holdings() -> list[tuple[str, float]]:
-    import requests
-    r = requests.get(INVESCO_URL, headers=UA, timeout=60)
-    r.raise_for_status()
-    j = r.json()
+    raw = http_get(INVESCO_URLS, "https://www.invesco.com/", "application/json, text/plain, */*")
+    j = json.loads(raw)
     keep = {"COM", "ADR", "DRNY", "REIT"}
     out = [(h["ticker"], float(h["units"])) for h in j["holdings"]
            if h.get("ticker") and h.get("securityTypeCode") in keep and h.get("units")]
@@ -64,10 +88,8 @@ def fetch_qqq_holdings() -> list[tuple[str, float]]:
 
 def fetch_spy_holdings() -> list[tuple[str, float]]:
     import pandas as pd
-    import requests
-    r = requests.get(SSGA_URL, headers=UA, timeout=60)
-    r.raise_for_status()
-    raw = pd.read_excel(io.BytesIO(r.content), header=None)
+    content = http_get([SSGA_URL], "https://www.ssga.com/us/en/intermediary/etfs/state-street-spdr-sp-500-etf-trust-spy")
+    raw = pd.read_excel(io.BytesIO(content), header=None)
     hdr = raw.index[raw.iloc[:, 1].astype(str).str.strip().eq("Ticker")][0]
     df = raw.iloc[hdr + 1:].copy()
     df.columns = [str(c).strip() for c in raw.iloc[hdr]]
