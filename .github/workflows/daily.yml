@@ -34,11 +34,14 @@ jobs:
 
       - name: Run agent
         run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            python agent.py --date "${{ github.event.inputs.date }}"
-          else
-            python agent.py
-          fi
+          set -o pipefail
+          ARGS=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
+          python -u agent.py $ARGS 2>&1 | tee run.log || {
+            tail -n 25 run.log | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          }
+          grep -E "סכום|אזהרה" run.log | while IFS= read -r l; do echo "::notice::$l"; done
 
       - name: Commit dashboard
         run: |
