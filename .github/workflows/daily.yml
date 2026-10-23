@@ -10,6 +10,10 @@ on:
       date:
         description: "תאריך (YYYY-MM-DD), ריק = יום המסחר האחרון"
         required: false
+      email:
+        description: "לשלוח מייל?"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -51,7 +55,25 @@ jobs:
           git diff --cached --quiet || git commit -m "dashboard $(ls -t docs/data | head -1 | cut -d. -f1)"
           git push
 
+      - name: Snapshot dashboard (phone layout)
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+          python snapshot.py
+
+      - name: Send email
+        if: github.event_name == 'schedule' || github.event.inputs.email == 'true'
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python send_mail.py
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: dashboard
-          path: docs/index.html
+          path: |
+            docs/index.html
+            out/*.png
