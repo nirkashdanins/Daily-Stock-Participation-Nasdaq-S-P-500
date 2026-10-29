@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="he">
+<title>מי הזיז את המדד</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap">
+<style>
+/* Layout: one slide per index — header, RTL title, wide English contribution chart left + Hebrew stat column right. Single dark look by design. */
+:root{
+  --bg:#050506; --card:#141416; --card2:#1c1c1f; --line:#26262a;
+  --fg:#f4f4f5; --soft:#c9c9cf; --mute:#8b8b93; --dim:#5d5d64;
+  --red:#ef5a47; --green:#5fd068; --dot:#ef3b2d;
+  --f:'Heebo',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0;font-family:var(--f);font-variant-numeric:tabular-nums}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.wrap{max-width:1840px;margin:0 auto;padding-block:14px 20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em;font-size:20px}
+.brand i{width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.meta{display:flex;align-items:center;gap:12px;color:var(--mute);font-size:17px}
+.tabs{display:flex;gap:6px}
+.tabs button{font:inherit;font-weight:800;font-size:15px;letter-spacing:.04em;border:1px solid var(--line);background:transparent;color:var(--mute);padding:5px 12px;border-radius:999px;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--card2);color:var(--fg);border-color:#3a3a40}
+.tabs button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap-reverse;margin:18px 0 16px}
+.kicker{font-size:14px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
+.ttl{direction:rtl;text-align:right;margin-inline-start:auto}
+.ttl h1{margin:0;font-size:clamp(30px,4vw,56px);font-weight:900;letter-spacing:-.02em;line-height:1.05;text-wrap:balance}
+.ttl p{margin:8px 0 0;color:var(--mute);font-size:18px;direction:ltr;text-align:right}
+.grid{display:grid;grid-template-columns:minmax(0,2.55fr) minmax(0,1fr);gap:24px;align-items:start}
+.chart{background:var(--card);border-radius:18px;padding:18px 28px 14px;min-width:0}
+.leg{display:flex;gap:18px;font-size:16px;color:var(--mute);margin-bottom:12px;flex-wrap:wrap}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg b{width:12px;height:12px;border-radius:2px;display:inline-block}
+.row{display:grid;grid-template-columns:86px 80px minmax(0,1fr) 84px 96px;align-items:center;height:clamp(28px,3.15vh,34px);gap:12px}
+.hdr{height:auto;padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;color:var(--mute);letter-spacing:.08em;text-transform:uppercase}
+.hdr .num{text-align:right}
+.row .t{font-weight:800;font-size:22px}
+.row .w{color:var(--soft);font-size:18px;text-align:right}
+.row .v{text-align:right;font-weight:800;font-size:21px}
+.row .p{text-align:right;color:var(--soft);font-size:18px}
+.trk{position:relative;height:25px}
+.bar{position:absolute;top:0;height:100%;border-radius:3px}
+.neg .bar{background:var(--red)} .pos .bar{background:var(--green)}
+.neg .v{color:var(--red)} .pos .v{color:var(--green)}
+.sep{height:1px;background:var(--line);margin:6px 0}
+.side{display:flex;flex-direction:column;gap:14px;direction:rtl}
+.box{background:var(--card);border-radius:18px;padding:16px 20px}
+.box h3{margin:0;font-size:18px;font-weight:500;color:var(--soft)}
+.big{text-align:center;padding:20px 22px 22px}
+.big .n{font-size:clamp(60px,6vw,96px);font-weight:900;letter-spacing:-.05em;line-height:1;margin-top:12px;direction:ltr}
+.big .s{margin-top:10px;color:var(--soft);font-size:20px;direction:ltr}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.duo .n{font-size:clamp(32px,3vw,44px);font-weight:800;margin-top:8px;direction:ltr;text-align:right;letter-spacing:-.02em}
+.sm{font-size:15px;color:var(--mute);margin-top:6px}
+.brd{height:5px;border-radius:3px;background:var(--red);margin-top:10px;overflow:hidden;direction:ltr}
+.brd i{display:block;height:100%;background:var(--green)}
+.note{font-size:20px;line-height:1.6;color:#e4e4e7;font-weight:500}
+.note em{font-style:normal;color:var(--red);font-weight:700}
+.note em.g{color:var(--green)}
+.red{color:var(--red)} .green{color:var(--green)} .muted{color:var(--mute)}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:14px;color:var(--dim)}
+.chk{color:var(--mute);direction:rtl}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.chart{padding:14px 10px}.row{grid-template-columns:48px 42px minmax(0,1fr) 46px 56px;gap:5px}.row .t{font-size:13px}.row .v{font-size:13px}.row .p,.row .w{font-size:11px}.hdr{font-size:9px;letter-spacing:.04em}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><i></i>NIR · STOCKS</div>
+    <div class="meta"><div class="tabs" id="tabs"></div><span id="date"></span></div>
+  </div>
+  <div class="head">
+    <div class="kicker" id="kick"></div>
+    <div class="ttl"><h1 id="h1"></h1><p id="sub"></p></div>
+  </div>
+  <div class="grid">
+    <div class="chart">
+      <div class="leg"><span><b style="background:var(--red)"></b><em id="lgd" style="font-style:normal"></em></span><span><b style="background:var(--green)"></b><em id="lgu" style="font-style:normal"></em></span></div>
+      <div class="row hdr"><div>Ticker</div><div class="num">Weight</div><div></div><div class="num">BPS</div><div class="num">% Move</div></div>
+      <div id="rows"></div>
+    </div>
+    <div class="side">
+      <div class="box big"><h3>תרומה מצטברת למדד</h3><div class="n" id="tot"></div><div class="s" id="tots"></div></div>
+      <div class="duo">
+        <div class="box"><h3>10 התומכות</h3><div class="n green" id="ts"></div></div>
+        <div class="box"><h3>10 המושכות למטה</h3><div class="n red" id="bs"></div></div>
+      </div>
+      <div class="duo">
+        <div class="box"><h3>עלו / ירדו</h3><div class="n" id="ud"></div><div class="brd"><i id="udb"></i></div><div class="sm" id="udp"></div></div>
+        <div class="box"><h3>שבבים</h3><div class="n" id="semi"></div><div class="sm" id="semin"></div></div>
+      </div>
+      <div class="box note" id="note"></div>
+    </div>
+  </div>
+  <div class="foot"><span>Source: Yahoo Finance closes · weights: QQQ holdings (Invesco), SPY holdings (State Street) · contribution = start-of-day weight × return · bps</span><span class="chk" id="chk"></span></div>
+</div>
+
+<script>
+const DATA={"date": "2026-10-28", "QQQ": {"total": 54.5, "bottom": [["NVDA", -9.6, -1.17, 8.18], ["AAPL", -7.4, -0.94, 7.89], ["SPCX", -6.2, -2.25, 2.74], ["META", -3.6, -1.24, 2.87], ["FTNT", -3.4, -5.9, 0.58], ["TSLA", -2.7, -0.8, 3.33], ["PANW", -2.5, -1.79, 1.41], ["PLTR", -1.9, -0.97, 1.97], ["BKR", -1.9, -7.36, 0.25], ["CSCO", -1.8, -0.98, 1.89]], "top": [["MU", 26.4, 5.86, 4.51], ["AMD", 12.8, 3.24, 3.93], ["AVGO", 7.0, 2.77, 2.54], ["LRCX", 7.0, 5.39, 1.3], ["AMAT", 6.8, 5.07, 1.35], ["SNDK", 6.3, 7.66, 0.82], ["GOOG", 4.4, 1.6, 2.73], ["INTC", 4.0, 1.91, 2.12], ["GOOGL", 3.9, 1.34, 2.93], ["MRVL", 3.0, 3.32, 0.92]], "bot_sum": -41.0, "top_sum": 81.7, "up": 51, "down": 50, "flat": 0, "n": 101, "semis": 69.7, "semis_n": 20, "actual": 0.55}, "SPY": {"total": 27.7, "bottom": [["NVDA", -9.3, -1.17, 7.93], ["AAPL", -7.2, -0.94, 7.62], ["META", -2.6, -1.24, 2.06], ["TSLA", -1.4, -0.8, 1.73], ["FTNT", -1.0, -5.9, 0.17], ["PANW", -0.9, -1.79, 0.49], ["FFIV", -0.8, -20.43, 0.04], ["BRKB", -0.7, -0.49, 1.52], ["NOW", -0.7, -3.0, 0.24], ["GEV", -0.7, -1.9, 0.36]], "top": [["MU", 9.3, 5.86, 1.58], ["AVGO", 6.8, 2.77, 2.45], ["AMD", 4.5, 3.24, 1.38], ["GOOGL", 3.8, 1.34, 2.83], ["ORCL", 3.6, 10.73, 0.34], ["GOOG", 3.6, 1.6, 2.26], ["LRCX", 2.4, 5.39, 0.45], ["AMAT", 2.4, 5.07, 0.47], ["AMZN", 2.2, 0.59, 3.74], ["SNDK", 2.2, 7.66, 0.29]], "bot_sum": -25.3, "top_sum": 40.8, "up": 247, "down": 256, "flat": 0, "n": 503, "semis": 21.5, "semis_n": 22, "actual": 0.28}};
+const NAME={QQQ:'הנאסד״ק',SPY:'ה־S&P 500'}, CHK={QQQ:'נאסד״ק 100',SPY:'S&P 500'};
+const M='−';
+const sg=(v,d=1)=>(v>0?'+':v<0?M:'')+Math.abs(v).toFixed(d);
+const L=s=>`<span class="ltr">${s}</span>`;
+const $=id=>document.getElementById(id);
+function render(k){
+  const D=DATA[k], down=D.total<0;
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===k));
+  const dt=new Date(DATA.date+'T12:00:00Z');
+  $('date').textContent=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'})+' · Close';
+  $('kick').textContent=`${k} contribution · top 10 vs bottom 10`;
+  $('h1').textContent=(down?'מי הפיל את ':'מי הרים את ')+NAME[k]+' היום?';
+  $('sub').textContent=`Who moved ${k} the most — both ways`;
+  $('lgd').textContent=`Dragged ${k} down`; $('lgu').textContent=`Held ${k} up`;
+  const negMax=Math.max(...D.bottom.map(r=>-Math.min(r[1],0)),0), posMax=Math.max(...D.top.map(r=>Math.max(r[1],0)),0), span=(negMax+posMax)||1;
+  const z=negMax/span*100;
+  const row=r=>{const neg=r[1]<0,w=Math.max(Math.abs(r[1])/span*100,.4);
+    return `<div class="row ${neg?'neg':'pos'}"><div class="t">${r[0]}</div><div class="w">${r[3].toFixed(2)}%</div><div class="trk"><div class="bar" style="left:${neg?z-w:z}%;width:${w}%"></div></div><div class="v">${sg(r[1])}</div><div class="p">${sg(r[2],2)}%</div></div>`};
+  $('rows').innerHTML=D.bottom.map(row).join('')+'<div class="sep"></div>'+D.top.map(row).join('');
+  $('tot').textContent=sg(Math.round(D.total),0); $('tot').className='n '+(down?'red':'green');
+  $('tots').textContent=`bps · ≈ ${sg(D.total/100,1)}%`;
+  $('ts').textContent=sg(Math.round(D.top_sum),0); $('bs').textContent=sg(Math.round(D.bot_sum),0);
+  $('semi').textContent=sg(Math.round(D.semis),0); $('semi').className='n '+(D.semis<0?'red':'green');
+  $('semin').textContent=`${D.semis_n} מניות שבבים במדד`;
+  const tot=D.up+D.down+D.flat;
+  $('ud').innerHTML=`<span class="green">${D.up}</span> <span class="muted">/</span> <span class="red">${D.down}</span>`;
+  $('udb').style.width=(D.up/(D.up+D.down||1)*100)+'%';
+  $('udp').textContent=`${(D.up/tot*100).toFixed(1)}% עלו · ${(D.down/tot*100).toFixed(1)}% ירדו`+(D.flat?` · ${D.flat} ללא שינוי`:'');
+  const parts=[], T=Math.abs(D.total)||1;
+  const tenSide=Math.abs(down?D.bot_sum:D.top_sum);
+  if(tenSide>T) parts.push(`10 ה${down?'מושכות למטה מחקו':'תומכות הוסיפו'} <em class="${down?'':'g'}">${Math.round(tenSide)} נ״ב</em>, יותר מכל ה${down?'ירידה':'עלייה'} של המדד.`);
+  if(down&&D.up>D.down) parts.push(`${D.up} מניות עלו, ובכל זאת ${NAME[k]} ירד.`);
+  if(!down&&D.down>D.up) parts.push(`${D.down} מניות ירדו, ובכל זאת ${NAME[k]} עלה.`);
+  if(Math.sign(D.semis)===Math.sign(D.total)&&Math.abs(D.semis)/T>=.5)
+    parts.push(`השבבים לבדם ${down?'מחקו':'הוסיפו'} <em class="${down?'':'g'}">${Math.abs(Math.round(D.semis))} נ״ב</em>, כ־${Math.round(Math.abs(D.semis)/T*100)}% מה${down?'ירידה':'עלייה'}.`);
+  const lead=down?D.bottom:D.top, opp=Math.abs(down?D.top_sum:D.bot_sum);
+  if(Math.abs(lead[0][1])>opp) parts.push(`${L(lead[0][0])} לבדה ${down?'מחקה':'הוסיפה'} יותר מכל 10 ה${down?'תומכות':'מושכות'} ביחד.`);
+  else if(Math.abs(lead[0][1]+lead[1][1])>opp) parts.push(`<span style="white-space:nowrap">${L(lead[0][0])} ו־${L(lead[1][0])}</span> לבדן ${down?'מחקו':'הוסיפו'} יותר מכל 10 ה${down?'תומכות':'מושכות'} ביחד.`);
+  $('note').innerHTML=parts.slice(0,2).join(' ')||`סך התרומה ${L(sg(D.total))} נ״ב.`;
+  $('chk').innerHTML=`בדיקה: סכום ${D.n} התרומות ${L(sg(D.total))} נ״ב · ${CHK[k]} בפועל ${L(sg(D.actual,2)+'%')}`;
+  try{localStorage.setItem('idx',k)}catch(e){}
+}
+$('tabs').innerHTML=['QQQ','SPY'].map(k=>`<button type="button" data-k="${k}">${k}</button>`).join('');
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)render(b.dataset.k)});
+let k0='QQQ';try{const s=localStorage.getItem('idx');if(DATA[s])k0=s}catch(e){}
+if(location.hash.slice(1) in DATA)k0=location.hash.slice(1);
+render(k0);
+</script>
+
+</html>
