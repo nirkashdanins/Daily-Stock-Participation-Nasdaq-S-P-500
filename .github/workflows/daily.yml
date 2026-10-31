@@ -2,9 +2,14 @@ name: daily-index-contribution
 
 on:
   schedule:
-    # ימי ב'–ו' (ראשון–חמישי UTC) 04:17 UTC ≈ 07:17 שעון ישראל בקיץ / 06:17 בחורף
-    # מציג את יום המסחר האחרון שנסגר (ביום שני: נתוני שישי)
-    - cron: "17 4 * * 1-5"
+    # שעון ישראל קבוע (GitHub מטפל במעבר קיץ/חורף). ג'–שבת = אחרי סגירת ב'–ו' בארה"ב.
+    # 00:50 מחשב ושומר · 01:20 ממתין ל-07:00 ומוסר · 04:10 גיבוי
+    - cron: "50 0 * * 2-6"
+      timezone: "Asia/Jerusalem"
+    - cron: "20 1 * * 2-6"
+      timezone: "Asia/Jerusalem"
+    - cron: "10 4 * * 2-6"
+      timezone: "Asia/Jerusalem"
   workflow_dispatch:
     inputs:
       date:
@@ -18,6 +23,7 @@ on:
 permissions:
   contents: write
 
+# ההרצות רצות בזו אחר זו: בזמן שהרצת 01:20 ממתינה, הרצת 04:10 מחכה בתור כגיבוי
 concurrency:
   group: daily-index-contribution
   cancel-in-progress: false
@@ -25,50 +31,39 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      - run: pip install -r requirements.txt
-
-      - name: Run agent
+      - name: Install
         run: |
-          set -o pipefail
-          ARGS=""
-          if [ -n "${{ github.event.inputs.date }}" ]; then ARGS="--date ${{ github.event.inputs.date }}"; fi
-          python -u agent.py $ARGS 2>&1 | tee run.log || {
-            tail -n 25 run.log | while IFS= read -r l; do echo "::error::$l"; done
-            exit 1
-          }
-          grep -E "סכום|אזהרה" run.log | while IFS= read -r l; do echo "::notice::$l"; done
-
-      - name: Commit dashboard
-        run: |
+          pip install -r requirements.txt playwright
+          python -m playwright install --with-deps chromium
           git config user.name  "index-agent"
           git config user.email "index-agent@users.noreply.github.com"
-          git add docs
-          git diff --cached --quiet || git commit -m "dashboard $(ls -t docs/data | head -1 | cut -d. -f1)"
-          git push
 
-      - name: Snapshot dashboard (phone layout)
-        run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
-          python snapshot.py
-
-      - name: Send email
-        if: github.event_name == 'schedule' || github.event.inputs.email == 'true'
+      - name: Run
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-        run: python send_mail.py
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ARGS="--now"
+            [ -n "${{ github.event.inputs.date }}" ] && ARGS="$ARGS --date ${{ github.event.inputs.date }}"
+            [ "${{ github.event.inputs.email }}" = "true" ] || ARGS="$ARGS --no-email"
+          else
+            ARGS=""
+          fi
+          python -u run_daily.py $ARGS
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -77,3 +72,4 @@ jobs:
           path: |
             docs/index.html
             out/*.png
+          if-no-files-found: ignore

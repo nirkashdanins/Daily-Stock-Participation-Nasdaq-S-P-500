@@ -11,7 +11,7 @@
        תרומה (נ"ב) = משקל × תשואה יומית × 10,000.
        סכום כל התרומות = תשואת המדד (בדיקת איכות מול ^NDX / ^GSPC).
 
-הרצה:
+הרצה (ידנית; ההרצה היומית האוטומטית היא run_daily.py):
   python agent.py                       # יום המסחר האחרון שנסגר
   python agent.py --date 2026-10-22     # יום מסוים
   python agent.py --offline fixtures/   # בלי רשת, מקבצים שמורים (לבדיקות)
@@ -184,9 +184,11 @@ def quality(name, res):
     msg = f"{name}: סכום {res['total']:+.1f} נ\"ב | מדד בפועל {res['actual']}% | עלו/ירדו {res['up']}/{res['down']}"
     if res["skipped"]:
         msg += f" | חסרים מחירים: {', '.join(res['skipped'])}"
-    print(msg)
+    gh = bool(__import__("os").environ.get("GITHUB_ACTIONS"))
+    print(f"::notice::{msg}" if gh else msg)
     if res["actual"] is not None and abs(res["total"] / 100 - res["actual"]) > 0.15:
-        print(f"  ⚠ אזהרה: פער של יותר מ-15 נ\"ב בין הסכום למדד ב-{name}")
+        w = f"אזהרה: פער של יותר מ-15 נ\"ב בין הסכום למדד ב-{name}"
+        print(f"::warning::{w}" if gh else w)
 
 
 # ───────────────────────── פלט ─────────────────────────
@@ -199,14 +201,19 @@ def render(result: dict) -> str:
     return '<!doctype html>\n<html lang="he">\n' + body + "\n</html>\n"
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--date", help="YYYY-MM-DD; ברירת מחדל: יום המסחר האחרון שנסגר")
-    ap.add_argument("--offline", help="תיקייה עם prices.json, qqq_holdings.json, spy_holdings.json")
-    a = ap.parse_args()
+class NotReady(Exception):
+    """הנתונים של יום המסחר עדיין לא מלאים — לנסות במועד הבא."""
 
-    if a.offline:
-        f = Path(a.offline)
+
+def coverage(holdings, px, d0, d1) -> float:
+    ok = sum(1 for t, _ in holdings if d0 in px.get(t, {}) and d1 in px.get(t, {}))
+    return ok / max(len(holdings), 1)
+
+
+def build(date: str | None = None, offline: str | None = None, min_cov: float = 0.98) -> dict:
+    """שולף, בודק מוכנות ומחשב. מחזיר את התוצאה (לא כותב קבצים)."""
+    if offline:
+        f = Path(offline)
         qqq = json.loads((f / "qqq_holdings.json").read_text())
         spy = json.loads((f / "spy_holdings.json").read_text())
         px = json.loads((f / "prices.json").read_text())
@@ -215,20 +222,44 @@ def main():
         syms = sorted({t for t, _ in qqq} | {t for t, _ in spy} | {"SPY", "QQQ", "^NDX", "^GSPC"})
         px = fetch_prices(syms)
 
-    d0, d1 = pick_day(px, a.date)
+    d0, d1 = pick_day(px, date)
     print(f"יום יעד: {d1} (מול סגירה של {d0})")
+    # בדיקת מוכנות: מחיר סגירה ליום היעד למדדים ולרוב המניות
+    for ix in ("^NDX", "^GSPC"):
+        if d1 not in px.get(ix, {}):
+            raise NotReady(f"אין עדיין סגירה של {ix} ל-{d1}")
+    for name, h in (("QQQ", qqq), ("SPY", spy)):
+        c = coverage(h, px, d0, d1)
+        print(f"{name}: כיסוי מחירים {c:.1%}")
+        if c < min_cov:
+            raise NotReady(f"{name}: רק {c:.1%} מהמניות עם סגירה ל-{d1} (נדרש {min_cov:.0%})")
+
     result = {"date": d1, "prev": d0,
               "QQQ": compute(qqq, px, d0, d1, "^NDX"),
               "SPY": compute(spy, px, d0, d1, "^GSPC")}
     for k in ("QQQ", "SPY"):
         quality(k, result[k])
+    return result
 
+
+def write_docs(result: dict, update_index: bool = True) -> None:
+    """update_index=False: הרצה חוזרת על יום ישן — לא דורסת את הדף הראשי באתר."""
+    d1 = result["date"]
     (DOCS / "data").mkdir(parents=True, exist_ok=True)
     (DOCS / "data" / f"{d1}.json").write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
     html = render(result)
-    (DOCS / "index.html").write_text(html, encoding="utf-8")
+    if update_index:
+        (DOCS / "index.html").write_text(html, encoding="utf-8")
     (DOCS / f"{d1}.html").write_text(html, encoding="utf-8")
-    print(f"נכתב: docs/index.html, docs/{d1}.html, docs/data/{d1}.json")
+    print(f"נכתב: {'docs/index.html, ' if update_index else ''}docs/{d1}.html, docs/data/{d1}.json")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--date", help="YYYY-MM-DD; ברירת מחדל: יום המסחר האחרון שנסגר")
+    ap.add_argument("--offline", help="תיקייה עם prices.json, qqq_holdings.json, spy_holdings.json")
+    a = ap.parse_args()
+    write_docs(build(a.date, a.offline))
 
 
 if __name__ == "__main__":
