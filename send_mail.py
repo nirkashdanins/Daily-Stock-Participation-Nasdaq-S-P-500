@@ -28,6 +28,9 @@ def sg(v, d=0):
 
 
 def latest():
+    if "--date" in sys.argv:
+        d = sys.argv[sys.argv.index("--date") + 1]
+        return json.loads((ROOT / "docs" / "data" / f"{d}.json").read_text(encoding="utf-8"))
     files = sorted((ROOT / "docs" / "data").glob("????-??-??.json"))
     return json.loads(files[-1].read_text(encoding="utf-8"))
 

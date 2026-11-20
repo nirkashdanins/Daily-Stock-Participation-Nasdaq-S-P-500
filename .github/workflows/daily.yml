@@ -2,18 +2,28 @@ name: daily-index-contribution
 
 on:
   schedule:
-    # שעון ישראל קבוע (GitHub מטפל במעבר קיץ/חורף). ג'–שבת = אחרי סגירת ב'–ו' בארה"ב.
-    # 00:50 מחשב ושומר · 01:20 ממתין ל-07:00 ומוסר · 04:10 גיבוי
-    - cron: "50 0 * * 2-6"
+    # הרצות "עוגן" (שעון ישראל). GitHub מעכב אותן בשעות, לכן יש כמה — הראשונה שמתחילה
+    # ממתינה בעצמה לסגירה בארה"ב ומחזיקה את עצמה בחיים עד המסירה (ריצות המשך).
+    - cron: "0 18 * * 1-5"
       timezone: "Asia/Jerusalem"
-    - cron: "20 1 * * 2-6"
+    - cron: "30 20 * * 1-5"
       timezone: "Asia/Jerusalem"
-    - cron: "10 4 * * 2-6"
+    - cron: "45 22 * * 1-5"
+      timezone: "Asia/Jerusalem"
+    # רשת ביטחון בלילה/בוקר אם השרשרת נפלה
+    - cron: "30 2 * * 2-6"
+      timezone: "Asia/Jerusalem"
+    - cron: "30 5 * * 2-6"
       timezone: "Asia/Jerusalem"
   workflow_dispatch:
     inputs:
+      mode:
+        description: "now = מסירה מיידית · auto = לפי חלונות הזמן (משמש לריצות המשך)"
+        type: choice
+        options: [now, auto]
+        default: now
       date:
-        description: "תאריך (YYYY-MM-DD), ריק = יום המסחר האחרון"
+        description: "תאריך (YYYY-MM-DD), ריק = יום המסחר האחרון (רק ב-now)"
         required: false
       email:
         description: "לשלוח מייל?"
@@ -22,8 +32,9 @@ on:
 
 permissions:
   contents: write
+  actions: write     # להפעלת ריצת המשך
 
-# ההרצות רצות בזו אחר זו: בזמן שהרצת 01:20 ממתינה, הרצת 04:10 מחכה בתור כגיבוי
+# הרצות רצות בזו אחר זו; הרצה שממתינה בתור כשהשרשרת חיה — מסיימת בשנייה (אין מה לעשות)
 concurrency:
   group: daily-index-contribution
   cancel-in-progress: false
@@ -51,17 +62,19 @@ jobs:
 
       - name: Run
         env:
+          GH_TOKEN: ${{ github.token }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.mode }}" != "auto" ]; then
             ARGS="--now"
             [ -n "${{ github.event.inputs.date }}" ] && ARGS="$ARGS --date ${{ github.event.inputs.date }}"
-            [ "${{ github.event.inputs.email }}" = "true" ] || ARGS="$ARGS --no-email"
-          else
-            ARGS=""
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.email }}" = "false" ]; then
+            ARGS="$ARGS --no-email"
           fi
           python -u run_daily.py $ARGS
 

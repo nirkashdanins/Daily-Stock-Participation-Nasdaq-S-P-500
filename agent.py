@@ -107,32 +107,60 @@ def yahoo(t: str) -> str:
     return t.replace(".", "-")
 
 
-def fetch_prices(symbols: list[str]) -> dict[str, dict[str, float]]:
-    """{symbol: {YYYY-MM-DD: close}} — 10 ימי מסחר אחרונים, סגירה לא מתואמת לדיבידנד."""
-    import yfinance as yf
-    ys = sorted({yahoo(s) for s in symbols})
-    df = yf.download(ys, period="10d", interval="1d", auto_adjust=False,
-                     group_by="ticker", threads=True, progress=False)
-    out: dict[str, dict[str, float]] = {}
-    for s in symbols:
-        y = yahoo(s)
+def fetch_chart(sym: str) -> dict[str, float]:
+    """מחירי סגירה ממנה בודדת ישירות מ-API הגרפים של Yahoo (גיבוי ל-yfinance)."""
+    from curl_cffi import requests as cr
+    from urllib.parse import quote
+    for host in ("query2", "query1"):
         try:
-            col = df[y]["Close"].dropna()
-        except KeyError:
+            r = cr.get(f"https://{host}.finance.yahoo.com/v8/finance/chart/{quote(yahoo(sym))}"
+                       "?range=10d&interval=1d", impersonate="chrome", timeout=30)
+            if r.status_code != 200:
+                continue
+            res = r.json()["chart"]["result"][0]
+            tz = ZoneInfo(res["meta"].get("exchangeTimezoneName", "America/New_York"))
+            closes = res["indicators"]["quote"][0]["close"]
+            return {datetime.fromtimestamp(t, tz).strftime("%Y-%m-%d"): float(c)
+                    for t, c in zip(res["timestamp"], closes) if c is not None}
+        except Exception:  # noqa: BLE001
             continue
-        out[s] = {d.strftime("%Y-%m-%d"): float(v) for d, v in col.items()}
-    missing = [s for s in symbols if s not in out or not out[s]]
-    if missing:  # ניסיון חוזר בודד למה שלא חזר
-        df2 = yf.download([yahoo(s) for s in missing], period="10d", interval="1d",
-                          auto_adjust=False, group_by="ticker", progress=False)
-        for s in missing:
+    return {}
+
+
+def fetch_prices(symbols: list[str]) -> dict[str, dict[str, float]]:
+    """{symbol: {YYYY-MM-DD: close}} — 10 ימי מסחר אחרונים, סגירה לא מתואמת לדיבידנד.
+    הורדה מרוכזת ב-yfinance, ואז השלמה מניה-מניה לכל מי שחסר לו היום האחרון."""
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+    ys = sorted({yahoo(s) for s in symbols})
+    out: dict[str, dict[str, float]] = {}
+    try:
+        df = yf.download(ys, period="10d", interval="1d", auto_adjust=False,
+                         group_by="ticker", threads=True, progress=False)
+        for s in symbols:
             try:
-                col = (df2[yahoo(s)] if len(missing) > 1 else df2)["Close"].dropna()
-                if hasattr(col, "columns"):
-                    col = col.iloc[:, 0]
-                out[s] = {d.strftime("%Y-%m-%d"): float(v) for d, v in col.items()}
-            except Exception:
-                pass
+                col = df[yahoo(s)]["Close"].dropna()
+            except KeyError:
+                continue
+            out[s] = {d.strftime("%Y-%m-%d"): float(v) for d, v in col.items()}
+    except Exception as e:  # noqa: BLE001
+        print(f"yfinance נכשל ({type(e).__name__}); עובר להורדה מניה-מניה")
+
+    def latest() -> str:
+        days = [max(v) for k, v in out.items() if k in ("^GSPC", "^NDX", "SPY", "QQQ") and v]
+        return max(days) if days else ""
+
+    for rnd in range(3):
+        last = latest()
+        gaps = [s for s in symbols if not out.get(s) or (last and last not in out[s])]
+        if not gaps:
+            break
+        print(f"השלמת מחירים (סבב {rnd + 1}): {len(gaps)} מניות")
+        with ThreadPoolExecutor(8) as ex:
+            for s, px in zip(gaps, ex.map(fetch_chart, gaps)):
+                if px:
+                    out[s] = {**out.get(s, {}), **px}
+        __import__("time").sleep(5 * rnd)
     return out
 
 
@@ -143,7 +171,7 @@ def pick_day(px: dict, want: str | None) -> tuple[str, str]:
         i = days.index(want)
         return days[i - 1], days[i]
     now = datetime.now(ET)
-    if days[-1] == now.strftime("%Y-%m-%d") and (now.hour, now.minute) < (16, 20):
+    if days[-1] == now.strftime("%Y-%m-%d") and (now.hour, now.minute) < (16, 30):
         days = days[:-1]
     return days[-2], days[-1]
 

@@ -10,8 +10,14 @@ OUT = ROOT / "out"
 
 
 def main():
+    import sys
     OUT.mkdir(exist_ok=True)
-    url = (ROOT / "docs" / "index.html").resolve().as_uri()
+    page = ROOT / "docs" / "index.html"
+    if "--date" in sys.argv:
+        d = sys.argv[sys.argv.index("--date") + 1]
+        if (ROOT / "docs" / f"{d}.html").exists():
+            page = ROOT / "docs" / f"{d}.html"
+    url = page.resolve().as_uri()
     with sync_playwright() as p:
         b = p.chromium.launch()
         pg = b.new_page(viewport={"width": 620, "height": 900}, device_scale_factor=2)
